@@ -11,7 +11,10 @@
 # License: GNU General Public License, Version 3
 #
 import settings
+from terkin import logging
 from hiveeyes.datalogger import HiveeyesDatalogger
+
+log = logging.getLogger(__name__)
 
 
 class BobDatalogger(HiveeyesDatalogger):
@@ -28,7 +31,7 @@ class BobDatalogger(HiveeyesDatalogger):
         """
 
         # It's your turn.
-        #self.device.tlog('BOB loop')
+        #log.info('BOB loop')
 
         # Finally, schedule other system tasks.
         super().loop()
