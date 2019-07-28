@@ -71,6 +71,9 @@ download-requirements:
 	@#$(fetch) $(target_dir) https://raw.githubusercontent.com/robert-hh/BME280/a7074fd2d5a140a14957dbb7c6f247f975a6dcfa/bme280_int.py
 	$(fetch) $(target_dir) https://raw.githubusercontent.com/robert-hh/BME280/a7074fd2d5a140a14957dbb7c6f247f975a6dcfa/bme280_float.py
 
+	# Install INA219 libary
+	$(fetch) $(target_dir) https://raw.githubusercontent.com/chrisb2/pyb_ina219/94729d67ef5ccee195879ea5232b24f6d879d47c/ina219.py
+
 	# Install Pycom OneWire and DS18x20 libraries
 	# https://github.com/micropython/micropython/tree/master/drivers
 	mkdir -p $(target_dir)/onewire
