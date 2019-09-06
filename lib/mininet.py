@@ -13,7 +13,19 @@ class MiniNet:
 
     def __init__(self):
         print('INFO:  Starting MiniNet')
+        self.reconfigure_watchdog()
         self.station = network.WLAN()
+
+    def reconfigure_watchdog(self, timeout_seconds=600):
+        try:
+            from machine import WDT
+            watchdog_timeout = timeout_seconds
+            watchdog_timeout_effective = watchdog_timeout * 1000
+            wdt = WDT(timeout=watchdog_timeout_effective)
+            wdt.init(watchdog_timeout_effective)
+            print('INFO:  Reconfigured watchdog to {} seconds'.format(watchdog_timeout))
+        except:
+            pass
 
     def activate_wifi_ap(self):
         """
@@ -30,7 +42,7 @@ class MiniNet:
         print('INFO:  WiFi AP:  Starting access point')
         self.station.mode(network.WLAN.AP)
 
-    def connect_wifi_sta(self, ssid, password, timeout=3000):
+    def connect_wifi_sta(self, ssid, password, timeout=10000):
         """
         https://docs.pycom.io/firmwareapi/pycom/network/wlan/
         https://mike632t.wordpress.com/2017/04/11/connecting-my-wipy-to-my-wifi/
@@ -56,23 +68,18 @@ class MiniNet:
         nets = self.station.scan()
         ssids = [net.ssid for net in nets]
 
+        # TODO: Sort networks by RSSI.
+        #networks = [{'ssid': net.ssid, 'rssi': net.rssi} for net in nets]
+
         print('INFO:  WiFi STA: Networks found {}'.format(ssids))
+
         for net in nets:
             if net.ssid == ssid:
-                print('INFO:  WiFi STA: Connecting to "{}"'.format(ssid))
-                self.station.connect(net.ssid, auth=(net.sec, password), timeout=timeout)
-
-                try:
-                    while not self.station.isconnected():
-                        # Save power while waiting
-                        machine.idle()
-                        time.sleep_ms(250)
-                    print('INFO:  WiFi STA: Connected to "{}"'.format(ssid))
-
-                except Exception as ex:
-                    print('ERROR: WiFi STA: Connecting to "{}" failed. Please check SSID and PASSWORD.\n'.format(ssid, ex))
+                # Try to connect twice.
+                if self.connect_wifi_sta_single(ssid, net.sec, password, timeout=timeout):
                     break
-
+                if self.connect_wifi_sta_single(ssid, net.sec, password, timeout=timeout):
+                    break
 
         # Enable telnet and FTP server with new settings
         #server.init(login=('<user>', '<password>'), timeout=600)
@@ -93,6 +100,25 @@ class MiniNet:
 
         print()
         print('Note: Press CTRL+X or Ctrl+] to detach from the REPL')
+
+    def connect_wifi_sta_single(self, ssid, authmode, password, timeout=10000):
+
+        print('INFO:  WiFi STA: Connecting to "{}"'.format(ssid))
+        self.station.connect(ssid, auth=(authmode, password), timeout=timeout)
+
+        try:
+            # FIXME: This is a candidate for an infinite loop.
+            while not self.station.isconnected():
+                # Save power while waiting
+                machine.idle()
+                time.sleep_ms(250)
+
+            print('INFO:  WiFi STA: Connected to "{}"'.format(ssid))
+
+            return True
+
+        except Exception as ex:
+            print('ERROR: WiFi STA: Connecting to "{}" failed. Please check SSID and PASSWORD.\n{}'.format(ssid, ex))
 
     def wait_for_nic(self, retries=5):
         attempts = 0

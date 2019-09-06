@@ -3,10 +3,7 @@
 # (c) 2019 Andreas Motl <andreas@hiveeyes.org>
 # License: GNU General Public License, Version 3
 import time
-
 import machine
-
-from copy import deepcopy
 from terkin import __version__
 from terkin import logging
 from terkin.configuration import TerkinConfiguration
@@ -21,9 +18,13 @@ log = logging.getLogger(__name__)
 
 class ApplicationInfo:
 
-    def __init__(self, name=None, version=None, settings=None, application=None):
+    def __init__(self, name=None, version=None, settings=None, application=None, platform_info=None):
+
         self.name = name
         self.version = version
+
+        self.platform_info = platform_info
+
         self.settings = settings
         self.application = application
 
@@ -48,7 +49,7 @@ class TerkinDatalogger:
     # For the singleton factory.
     __instance__ = None
 
-    def __init__(self, settings):
+    def __init__(self, settings, platform_info=None):
 
         # Fulfill singleton factory.
         TerkinDatalogger.__instance__ = self
@@ -59,11 +60,12 @@ class TerkinDatalogger:
 
         self.application_info = ApplicationInfo(
             name=self.name, version=self.version, settings=self.settings,
-            application=self)
+            application=self, platform_info=platform_info)
 
         # Configure logging.
         logging_enabled = self.settings.get('main.logging.enabled', False)
         if not logging_enabled:
+            log.info('Disabling logging to save bytes')
             logging.disable_logging()
 
         # Initialize transient storage.
@@ -102,6 +104,12 @@ class TerkinDatalogger:
         # Start the watchdog for sanity.
         self.device.watchdog.start()
 
+        # Configure RGB-LED according to settings.
+        self.device.configure_rgb_led()
+
+        # Alternative startup signalling: 2 x green.
+        self.device.blink_led(0x000b00, count=2)
+
         # Turn off LTE modem and Bluetooth as we don't use them yet.
         # Todo: Revisit where this should actually go.
         # The modem driver takes about six seconds to initialize, so adjust the watchdog accordingly.
@@ -112,9 +120,6 @@ class TerkinDatalogger:
         self.device.watchdog.resume()
 
         log.info('Starting %s', self.application_info.fullname)
-
-        # Configure RGB-LED according to settings.
-        self.device.configure_rgb_led()
 
         # Dump configuration settings.
         log_configuration = self.settings.get('main.logging.configuration', False)
@@ -134,13 +139,16 @@ class TerkinDatalogger:
         # Hello world.
         self.device.print_bootscreen()
 
-        # Bootstrap infrastructure.
-        self.device.start_networking()
+        # Start networking and telemetry subsystems.
 
         # Conditionally start network services and telemetry if networking is available.
-        if self.device.status.networking:
-            self.device.start_telemetry()
-            self.device.start_network_services()
+        try:
+            self.device.start_networking()
+        except Exception:
+            log.exception('Networking subsystem failed')
+            self.status.networking = False
+
+        self.device.start_telemetry()
 
         # Todo: Signal readyness by publishing information about the device (Microhomie).
         # e.g. ``self.device.publish_properties()``
@@ -174,7 +182,7 @@ class TerkinDatalogger:
             # Run downstream mainloop handlers.
             self.loop()
 
-            # Yup.
+            # Give the system some breath.
             machine.idle()
 
     def loop(self):
@@ -183,6 +191,10 @@ class TerkinDatalogger:
         """
 
         #log.info('Terkin loop')
+
+        # Alternative loop signalling: 1 x blue.
+        # https://forum.pycom.io/topic/2067/brightness-of-on-board-led/7
+        self.device.blink_led(0x00000b, count=2)
 
         # Read sensors.
         readings = self.read_sensors()
@@ -194,7 +206,13 @@ class TerkinDatalogger:
         self.device.run_gc()
 
         # Transmit data.
-        self.transmit_readings(readings)
+        transmission_success = self.transmit_readings(readings)
+
+        # Signal transmission outcome.
+        if transmission_success:
+            self.device.blink_led(0x00000b)
+        else:
+            self.device.blink_led(0x0b0000)
 
         # Run the garbage collector.
         self.device.run_gc()
@@ -207,11 +225,13 @@ class TerkinDatalogger:
         Sleep until the next measurement cycle.
         """
 
+        lightsleep = self.settings.get('main.lightsleep', False)
         deepsleep = self.settings.get('main.deepsleep', False)
         interval = self.get_sleep_time()
 
         # Amend deep sleep intent when masked through maintenance mode.
         if self.device.status.maintenance is True:
+            lightsleep = False
             deepsleep = False
             log.info('Device is in maintenance mode. Skipping deep sleep and '
                      'adjusting interval to {} seconds'.format(interval))
@@ -227,7 +247,7 @@ class TerkinDatalogger:
                 self.device.power_off()
 
             # Send device to deep sleep.
-            self.device.hibernate(interval, deepsleep=deepsleep)
+            self.device.hibernate(interval, lightsleep=lightsleep, deepsleep=deepsleep)
 
         # When hibernation fails, fall back to regular "time.sleep".
         except:
@@ -345,9 +365,10 @@ class TerkinDatalogger:
                 # TODO: Attach settings directly to its reading, while actually reading it.
                 if 'devices' in sensor.settings:
                     for device_settings in sensor.settings['devices']:
-                        if device_settings['address'] in key:
+                        device_address = device_settings['address'].lower()
+                        if device_address in key:
                             if hasattr(sensor, 'get_device_description'):
-                                device_description = sensor.get_device_description(device_settings['address'])
+                                device_description = sensor.get_device_description(device_address)
                                 if device_description:
                                     richdata[key]['description'] = device_description
 

@@ -12,6 +12,7 @@ contributed to this software in one way or another.
 * Diren Senger <diren@uni-bremen.de>
 * Dominik Kapusta <https://github.com/ayoy>
 * Jan Hoffmann <j.hoffmann@isarengineering.de>
+* Markus <https://community.hiveeyes.org/u/poesel>
 * Michael Kurzweil <https://flowers4bees.org/>
 * Ralf Lindlein <https://github.com/walterheisenberg>
 * Richard Pobering <richard@hiveeyes.org>
@@ -31,6 +32,7 @@ people are doing on the foundation infrastructure the software is leveraging.
 
 - Damien George, Paul Sokolovsky, Dave Hylands, @stinos and all other
   `MicroPython core developers`_ and `micropython-lib`_ authors.
+- Paul Sokolovsky for improving MicroPython through the Pycopy fork.
 - All contributors to `pycom-micropython-sigfox`_ and `pycom-libraries`_.
 - Daniel Campora for the Pycom MQTT package.
 - David Gerber <https://github.com/geda>, Robert H. <https://github.com/robert-hh> and

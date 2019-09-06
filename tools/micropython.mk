@@ -2,7 +2,8 @@
 # Dependencies
 # ============
 
-$(eval rshell_options  := --port $(mcu_port) --user micro --password python --buffer-size $(mcu_transfer_buffer) --quiet)
+$(eval rshell_options  := --port $(mcu_port) --user micro --password python --buffer-size $(mcu_transfer_buffer))
+#$(eval rshell_options  := --port $(mcu_port) --user micro --password python --buffer-size $(mcu_transfer_buffer) --baud 115200 --quiet)
 #$(eval rshell_options  := --port $(mcu_port) --user micro --password python --buffer-size $(mcu_transfer_buffer) --timing)
 
 $(eval mpy-cross-all := ./bin/mpy_cross_all.py)
@@ -90,7 +91,7 @@ mpy-cross-setup: setup-virtualenv2
 
 	@echo "$(INFO) Installing mpy-cross-all"
 	@mkdir -p ./bin
-	@wget --quiet --output-document $(mpy-cross-all) https://raw.githubusercontent.com/hiveeyes/micropython/mpy-cross-plus/tools/mpy_cross_all.py
+	@wget --quiet --unlink --output-document $(mpy-cross-all) https://raw.githubusercontent.com/hiveeyes/micropython/mpy-cross-plus/tools/mpy_cross_all.py
 
 
 # ----

@@ -61,6 +61,7 @@ include tools/release.mk
 include tools/terkin.mk
 include tools/pycom.mk
 include tools/micropython.mk
+include tools/bluetooth.mk
 
 
 # ----
@@ -82,7 +83,7 @@ help: show-rules
 # Setup
 # -----
 ## Prepare sandbox environment and download requirements
-setup: setup-environment download-requirements
+setup: setup-environment download-requirements mpy-cross-setup
 
 
 # -----------------------
@@ -98,19 +99,19 @@ terkin-agent: setup-terkin-agent
 	sudo $(python3) tools/terkin.py $(action) $(macs)
 
 ## Load the MiniNet module to the device and start a WiFi access point.
-provide-wifi:
+provide-wifi: check-mcu-port
 	@$(rshell) $(rshell_options) --quiet cp lib/mininet.py /flash/lib
 	@$(rshell) $(rshell_options) --quiet repl "~ from mininet import MiniNet ~ MiniNet().activate_wifi_ap()"
 	@echo
 
 ## Load the MiniNet module to the device and start a WiFi STA connection.
-connect-wifi:
-	@$(rshell) $(rshell_options) --quiet cp lib/mininet.py /flash/lib
-	@$(rshell) $(rshell_options) --quiet repl "~ from mininet import MiniNet ~ MiniNet().connect_wifi_sta('$(ssid)', '$(password)')"
+connect-wifi: check-mcu-port
+	@$(rshell) $(rshell_options) --quiet cp lib/mininet.py /flash/lib/mininet_wip.py
+	@$(rshell) $(rshell_options) --quiet repl "~ from mininet_wip import MiniNet ~ MiniNet().connect_wifi_sta('$(ssid)', '$(password)')"
 	@echo
 
 ## Load the MiniNet module to the device and get IP address.
-ip-address:
+ip-address: check-mcu-port
 	@$(rshell) $(rshell_options) --quiet cp lib/mininet.py /flash/lib
 	@$(rshell) $(rshell_options) --quiet repl "~ from mininet import MiniNet ~ print(MiniNet().get_ip_address()) ~"
 	@echo
@@ -121,7 +122,7 @@ ip-address:
 # -----------------------------
 
 ## Compile all library files using mpy-cross
-mpy-compile: mpy-cross-setup
+mpy-compile:
 
 	@echo "$(INFO) Ahead-of-time compiling to .mpy bytecode"
 
@@ -151,11 +152,25 @@ recycle-ng: install-ng
 	@echo
 	@$(MAKE) confirm text="Restart device using the HTTP API?"
 
-	$(MAKE) restart-device
+	@$(MAKE) restart-device
 
 ## Upload program and settings and restart attached to REPL
 sketch-and-run: install-sketch reset-device-attached
 
+## Pyboard-D transfer
+pyboard-install:
+	@if test -e "/Volumes/PYBFLASH"; then \
+		rsync -auv dist-packages lib hiveeyes terkin boot.py main.py settings.py /Volumes/PYBFLASH; \
+	else \
+		echo "ERROR: Could not find /Volumes/PYBFLASH, exiting"; \
+		exit 1; \
+	fi
+
+pyboard-reset:
+	diskutil unmount /Volumes/PYBFLASH || true
+	$(MAKE) reset-device sleep sleep console
+
+pyboard-recycle: pyboard-install pyboard-reset
 
 
 # ------------------

@@ -3,7 +3,7 @@
 # (c) 2019 Andreas Motl <andreas@hiveeyes.org>
 # License: GNU General Public License, Version 3
 import time
-from machine import ADC, enable_irq, disable_irq
+from machine import enable_irq, disable_irq
 from micropython import const
 from terkin import logging
 
@@ -103,22 +103,31 @@ class SystemBatteryLevel:
         # Resistor between input pin and ground (R2).
         self.resistor_r2 = None
 
-        # ADC channel used for sampling the raw value.
-        self.adc = ADC(id=0)
+        # Reference to platform ADC object.
+        self.adc = None
 
     def setup(self, settings):
+
         self.pin = settings.get('sensors.system.vcc.pin')
         self.resistor_r1 = settings.get('sensors.system.vcc.resistor_r1')
         self.resistor_r2 = settings.get('sensors.system.vcc.resistor_r2')
+
+        assert type(self.pin) is str, 'VCC Error: Voltage divider ADC pin invalid'
+        assert type(self.resistor_r1) is int, 'VCC Error: Voltage divider resistor value "resistor_r1" invalid'
+        assert type(self.resistor_r2) is int, 'VCC Error: Voltage divider resistor value "resistor_r2" invalid'
+
+        # ADC channel used for sampling the raw value.
+        from machine import ADC
+        try:
+            self.adc = ADC(id=0)
+        except TypeError:
+            from machine import Pin
+            self.adc = ADC(Pin(self.pin))
 
     def read(self):
         """
         Acquire vbatt reading by sampling ADC.
         """
-
-        assert type(self.pin) is str, 'VCC Error: Voltage divider ADC pin invalid'
-        assert type(self.resistor_r1) is int, 'VCC Error: Voltage divider resistor value "resistor_r1" invalid'
-        assert type(self.resistor_r2) is int, 'VCC Error: Voltage divider resistor value "resistor_r2" invalid'
 
         # Power on ADC.
         self.adc.init()
@@ -127,6 +136,7 @@ class SystemBatteryLevel:
 
         # Sample ADC a few times.
         # Todo: Make attenuation factor configurable.
+        from machine import ADC
         adc_channel = self.adc.channel(attn=ADC.ATTN_6DB, pin=self.pin)
         adc_samples = [0.0] * self.adc_sample_count
         adc_mean = 0.0

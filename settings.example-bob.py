@@ -7,7 +7,12 @@ main = {
     # Todo: Please note this is not the _real thing_ yet at it will just use
     #       this value to apply to ``time.sleep()`` after each duty cycle.
     'interval': {
+
+        # Apply this interval if device is in field mode.
         'field': 60.0,
+
+        # Apply this interval if device is in maintenance mode.
+        # https://community.hiveeyes.org/t/wartungsmodus-fur-den-terkin-datenlogger/2274
         'maintenance': 15.0,
     },
 
@@ -31,7 +36,7 @@ main = {
         'enabled': False,
 
         # Watchdog timeout in milliseconds.
-        'timeout': 20000,
+        'timeout': 60000,
     },
 
     # Configure backup.
@@ -45,7 +50,12 @@ main = {
 
     # Configure RGB-LED.
     'rgb_led': {
+
+        # Use the builtin heartbeat blink pattern. Default: True.
         'heartbeat': True,
+
+        # Activate the Terkin blink pattern. Will disable the builtin heartbeat pattern when enabled.
+        'terkin': False,
     },
 
 }

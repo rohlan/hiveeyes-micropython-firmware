@@ -8,8 +8,8 @@ import time
 
 import machine
 
+from mboot import MicroPythonPlatform
 from terkin import logging
-from terkin.pycom import MachineResetCause
 from terkin.telemetry import TelemetryManager, TelemetryAdapter
 from terkin.util import get_device_id
 from terkin.watchdog import Watchdog
@@ -60,14 +60,19 @@ class TerkinDevice:
         try:
             self.networking.start_wifi()
 
-            # Wait for network interface to come up.
-            self.networking.wait_for_nic()
-
-            self.status.networking = True
-
-        except WiFiException:
+        except Exception:
             log.error('Network connectivity not available, WiFi failed')
             self.status.networking = False
+
+        # Wait for network stack to come up.
+        try:
+            self.networking.wait_for_ip_stack(timeout=10)
+            self.status.networking = True
+            self.networking.start_services()
+        except:
+            log.error('IP stack not available')
+            self.status.networking = False
+
 
         # Initialize LoRa device.
         if self.settings.get('networking.lora.antenna_attached'):
@@ -115,67 +120,26 @@ class TerkinDevice:
         """
         https://docs.pycom.io/tutorials/all/rgbled.html
         """
-        import pycom
+        if self.application_info.platform_info.vendor == MicroPythonPlatform.Pycom:
+            import pycom
+            # Enable or disable heartbeat.
+            rgb_led_heartbeat = self.settings.get('main.rgb_led.heartbeat', True)
+            terkin_blink_pattern = self.settings.get('main.rgb_led.terkin', False)
+            if terkin_blink_pattern:
+                rgb_led_heartbeat = False
+            pycom.heartbeat(rgb_led_heartbeat)
+            pycom.heartbeat_on_boot(rgb_led_heartbeat)
 
-        # Enable or disable heartbeat.
-        rgb_led_heartbeat = self.settings.get('main.rgb_led.heartbeat', True)
-        pycom.heartbeat(rgb_led_heartbeat)
-        pycom.heartbeat_on_boot(rgb_led_heartbeat)
-
-        # Alternative signalling.
-        # Todo: Run this in a separate thread in order not to delay execution of main program flow.
-        if not rgb_led_heartbeat:
-            for _ in range(2):
-                pycom.rgbled(0x001100)
-                time.sleep(0.15)
-                pycom.rgbled(0x000000)
-                time.sleep(0.10)
-
-    def power_off_lte_modem(self):
-        """
-        We don't use LTE yet.
-
-        https://community.hiveeyes.org/t/lte-modem-des-pycom-fipy-komplett-stilllegen/2161
-        https://forum.pycom.io/topic/4877/deepsleep-on-batteries/10
-        """
-
-        import pycom
-
-        """
-        if not pycom.lte_modem_en_on_boot():
-            log.info('Skip turning off LTE modem')
-            return
-        """
-
-        log.info('Turning off LTE modem')
-        try:
-            from network import LTE
-
-            # Invoking this will cause `LTE.deinit()` to take around 6(!) seconds.
-            #log.info('Enabling LTE modem on boot')
-            #pycom.lte_modem_en_on_boot(True)
-
-            log.info('Turning off LTE modem on boot')
-            pycom.lte_modem_en_on_boot(False)
-
-            log.info('Invoking LTE.deinit()')
-            lte = LTE()
-            lte.deinit()
-
-        except:
-            log.exception('Shutting down LTE modem failed')
-
-    def power_off_bluetooth(self):
-        """
-        We don't use Bluetooth yet.
-        """
-        log.info('Turning off Bluetooth')
-        try:
-            from network import Bluetooth
-            bluetooth = Bluetooth()
-            bluetooth.deinit()
-        except:
-            log.exception('Shutting down Bluetooth failed')
+    def blink_led(self, color, count=1):
+        if self.application_info.platform_info.vendor == MicroPythonPlatform.Pycom:
+            import pycom
+            terkin_blink_pattern = self.settings.get('main.rgb_led.terkin', False)
+            if terkin_blink_pattern:
+                for _ in range(count):
+                    pycom.rgbled(color)
+                    time.sleep(0.15)
+                    pycom.rgbled(0x000000)
+                    time.sleep(0.10)
 
     def start_telemetry(self):
         log.info('Starting telemetry')
@@ -199,16 +163,6 @@ class TerkinDevice:
 
             except:
                 log.exception('Creating telemetry adapter failed for target: %s', telemetry_target)
-
-    def start_network_services(self):
-
-        # Start UDP server for pulling device into maintenance mode.
-        if self.settings.get('services.api.modeserver.enabled', False):
-            self.networking.start_modeserver()
-
-        # Start HTTP server
-        if self.settings.get('services.api.http.enabled', False):
-            self.networking.start_httpserver()
 
     def create_telemetry_adapter(self, telemetry_target):
         # Create adapter object.
@@ -268,8 +222,9 @@ class TerkinDevice:
         add()
 
         # System memory info (in bytes)
-        machine.info()
-        add()
+        if hasattr(machine, 'info'):
+            machine.info()
+            add()
 
         # TODO: Python runtime information.
         add('{:8}: {}'.format('Python', sys.version))
@@ -295,7 +250,53 @@ class TerkinDevice:
     def power_off(self):
         self.networking.stop()
 
-    def hibernate(self, interval, deepsleep=False):
+    def power_off_lte_modem(self):
+        """
+        We don't use LTE yet.
+
+        https://community.hiveeyes.org/t/lte-modem-des-pycom-fipy-komplett-stilllegen/2161
+        https://forum.pycom.io/topic/4877/deepsleep-on-batteries/10
+        """
+
+        import pycom
+
+        """
+        if not pycom.lte_modem_en_on_boot():
+            log.info('Skip turning off LTE modem')
+            return
+        """
+
+        log.info('Turning off LTE modem')
+        try:
+            from network import LTE
+
+            # Invoking this will cause `LTE.deinit()` to take around 6(!) seconds.
+            #log.info('Enabling LTE modem on boot')
+            #pycom.lte_modem_en_on_boot(True)
+
+            log.info('Turning off LTE modem on boot')
+            pycom.lte_modem_en_on_boot(False)
+
+            log.info('Invoking LTE.deinit()')
+            lte = LTE()
+            lte.deinit()
+
+        except:
+            log.exception('Shutting down LTE modem failed')
+
+    def power_off_bluetooth(self):
+        """
+        We don't use Bluetooth yet.
+        """
+        log.info('Turning off Bluetooth')
+        try:
+            from network import Bluetooth
+            bluetooth = Bluetooth()
+            bluetooth.deinit()
+        except:
+            log.exception('Shutting down Bluetooth failed')
+
+    def hibernate(self, interval, lightsleep=False, deepsleep=False):
 
         #logging.enable_logging()
 
@@ -316,8 +317,6 @@ class TerkinDevice:
 
         else:
 
-            log.info('Waiting for {} seconds'.format(interval))
-
             # Adjust watchdog for interval.
             self.watchdog.adjust_for_interval(interval)
 
@@ -330,15 +329,21 @@ class TerkinDevice:
             # machine.sleep(int(interval * 1000))
             machine.idle()
 
-            # Normal wait.
-            time.sleep(interval)
+            if lightsleep:
+                log.info('Entering light sleep for {} seconds'.format(interval))
+                machine.sleep(int(interval * 1000))
 
-            # Light sleep.
-            # TODO: Implement light sleep.
-            #machine.sleep(int(interval * 1000))
+            else:
+                # Normal wait.
+                log.info('Waiting for {} seconds'.format(interval))
+                time.sleep(interval)
 
     def resume(self):
-        log.info('Reset cause and wakeup reason: %s', MachineResetCause.humanize())
+        try:
+            from terkin.pycom import MachineResetCause
+            log.info('Reset cause and wakeup reason: %s', MachineResetCause.humanize())
+        except:
+            log.warning('Could not determine reset cause')
 
     def set_wakeup_mode(self):
 

@@ -5,6 +5,25 @@ Hiveeyes MicroPython Datalogger CHANGES
 
 Development
 ===========
+- Fix sandbox installation issue by nailing pycopy-cpython-upip to 1.2.6
+- Improve sanity checks for sandbox setup
+- Improve RGB-LED signalling
+- Import microWebSrv only when enabling HTTP service to save memory
+- Make WiFi work in non-threaded environments again
+- Improve MiniNet WiFi connectivity
+- Improve logging timestamping
+- Improve sandbox tooling robustness
+- Upgrade to pycopy-cpython-upip==1.3.3 again. Thanks, Paul!
+- Add basic recycle task for uploading the code to the Pyboard D
+- Start LoRa on demand to reduce memory consumption
+- Defer loading modules for sensors at runtime to save memory
+- Load the ADC module for "SystemBatteryLevel" at runtime
+- Fix missing ADC module import
+- Process DS18B20 addresses case insensitive
+
+
+2019-08-19 0.6.0
+================
 - Explicitly ``deinit()`` LTE modem on each startup
 - Fix ``settings.example-bob.py``. Thanks, `@MKO1640`_ and `@ClemensGruber`_.
 - Improve formatting of BEEP telemetry field mapping for BOB
@@ -93,7 +112,6 @@ Development
 - Refactor and improve DS18B20 settings, reading and processing
 - Improve prettified sensor readings log output
 - Improve HTTP API
-- Adjust waiting time after resetting 1-Wire bus
 - Improve initialization robustness with bus device objects
 - Add ``mpy-cross-util.py``
 - Add ahead-of-time compilation using ``mpy-cross``
@@ -118,6 +136,25 @@ Development
 - Add tools for building firmware images for ESP32 based on Pycom MicroPython.
   Thanks, `@emmanuel-florent`_.
 - onewire.py: Use library optimized for timing and with enabled CRC checks by `@robert-hh`_, thanks!
+- First steps with BLE (WIP)
+- First steps with LTE (WIP)
+- Be more graceful when starting network services
+- Wrap "station.isconnected()" to mitigate unhandled exceptions on timeout errors
+- Extend default watchdog timeout to 60 seconds
+- Try two times to connect to WiFi station
+- Makefile improvements
+  - Don't run "mpy-cross-setup" on each invocation of "mpy-compile"
+  - Don't clobber "mpy_cross_all.py"
+- Improve LED signalling
+- Parallelize networking subsystem
+- Prepare real "light sleep" (WIP)
+- Attempt to reset WiFi connection if scanning fails
+- Add "mboot", the universal MicroPython bootloader
+- Reconfigure watchdog when connecting the device using MiniNet
+- Propagate platform information for implementing platform switch conditions
+- Transfer "mboot" bootloader and "mininet" module
+- Start making Terkin platform-agnostic. Thanks, Markus!
+- Add release archives with frozen modules compatible to Pycom MicroPython
 
 
 2019-06-22 0.5.1
